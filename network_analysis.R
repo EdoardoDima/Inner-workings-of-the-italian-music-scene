@@ -1,10 +1,10 @@
 library(igraph)
 
-nodes = read.csv("C:/Users/CreCre/Documents/nodes_2.csv")
-edges = read.csv("C:/Users/CreCre/Documents/edges_2_clean.csv")
+nodes = read.csv("nodes_2.csv")
+edges = read.csv("edges_2_clean.csv")
 
-artist_df_2 = read.csv("C:/Users/CreCre/Documents/artist_df_2.csv")
-artist_hiphop = read.csv("C:/Users/CreCre/Documents/artist_hiphop.csv")
+artist_df_2 = read.csv("artist_df_2.csv")
+artist_hiphop = read.csv("artist_hiphop.csv")
 
 
 artist_df = rbind(artist_df_2, artist_hiphop)
@@ -90,7 +90,6 @@ g_v2 = set_vertex_attr(g_v2, 'Genre', index = V(g_v2), artisti_cc_genre)
 g_v2 = set_vertex_attr(g_v2, 'Popularity', index = V(g_v2), artisti_cc_popol)
 get.vertex.attribute(g_v2,'Popularity')
 
-plot(g, vertex.color = pal[as.numeric(as.factor(vertex_attr(g_v2, "Genre")))])
 
 plot(g_v2, vertex.size=vertex_attr(g_v2,'Popularity'), edge.curverd=.1, arrow.size=.1, #vertex.color = , 
      main = "Ueeeueeee",
@@ -121,7 +120,9 @@ plot(g_v2, vertex.size=5, edge.curverd=.1, arrow.size=.1,
 
 
 g_rap = delete_vertices(g_v2, V(g_v2)[!vertex_attr(g_v2, "Genre") == 'Rap/Hip-Hop'])
+zero_degree_rap = which(V(g_rap)$degree==0)
 
+g_rap = g_rap - zero_degree
 
 plot(g_rap,vertex.size=5, edge.curverd=.1, arrow.size=.1, 
      main = "Ueeeueeee",
@@ -134,3 +135,14 @@ mean(degree_rap)
 
 hist(degree_rap[degree_rap > 0], breaks = 100, col = 'orchid',
      xlab = 'Degree', main = 'UEUEUE')
+
+assortativity_degree(g_rap, directed = FALSE)
+
+prova_knn = knn(
+  g_rap,
+  vids = V(g_rap),
+  mode = 'all',
+  neighbor.degree.mode = 'all',
+  weights = NULL
+)
+
