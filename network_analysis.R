@@ -5,7 +5,21 @@ library(reshape2)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-library(dplyr)
+library(ITNr)
+library(backbone)
+library(WGCNA)
+#library(dplyr)
+#library(networkD3)
+#library(network)
+
+##### IDEA 07/02 ---> Compara assortativity generale con quella del network
+####################  risultante dopo aver selezionato solo artisti con popularity > 50
+####################  per vedere se assortativity bassa è causa del network troppo grande
+####################  e con molti artisti poco popolari
+
+
+##### 13/02 ---> PENSA A QUESTO: dato che l'assortativity per popolarità è maggiore
+################# di quella per degree, significa che i nodi popolari non sono per forza hubs?
 
 #####
 # Loading and preprocessing
@@ -79,6 +93,10 @@ g = set_vertex_attr(g, 'Genre', index = V(g), artisti_genre)
 g = set_vertex_attr(g, 'Popularity', index = V(g), artisti_popol)
 g = set_vertex_attr(g, 'Followers', index = V(g), artisti_foll)
 
+V(g)[vertex_attr(g,'Genre') == 'Rap/Hip-Hop']$color = 'deeppink4'
+V(g)[vertex_attr(g,'Genre') == 'Indie']$color = 'turquoise4'
+V(g)[vertex_attr(g,'Genre') == 'Pop']$color = 'azure4'
+V(g)[vertex_attr(g,'Genre') == 'Emo/Punk']$color = 'olivedrab'
 
 V(g)$degree <- degree(g)
 zero_degree = which(degree(g)==0)
@@ -91,7 +109,8 @@ g = g - zero_degree
 plot(g, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "orchid", 
      main = "UEEE",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.fruchterman.reingold, 
-     vertex.label = ifelse(degree(g) >= 34, V(g)$name, NA))
+     vertex.label = NA)#ifelse(degree(g) >= 34, V(g)$name, NA))
+
 
 
 degree_g = sort(igraph::degree(g, v = V(g), mode = "all"), decreasing = TRUE)
@@ -100,6 +119,31 @@ mean(degree_g)
 
 hist(degree_g[degree_g > 0], breaks = 100, col = 'orchid',
      xlab = 'Degree', main = 'UEUEUE')
+
+plot_degree_distribution(g, a = 'all')
+
+x = degree_g
+
+plot(log(degree_g[degree_g > 0]))
+
+occur = as.vector(table(x))
+occur = occur/sum(occur)
+p = occur/sum(occur)
+y = rev(cumsum(rev(p)))
+x = as.numeric(names(table(x)))
+plot(x, y, log="xy", type="l")
+
+scaleFreePlot(degree_g,main = 'Scale-free fit ')
+
+
+backbone.suggest(g)
+?sparsify.with.lspar
+g_backbone = sparsify.with.localdegree(g, s = 0.1)
+plot(g_backbone, vertex.size=ifelse(degree(g) >= 5, V(g)$degree/60*10, V(g)$degree+2), 
+     edge.curverd=.1, arrow.size=.1, 
+     main = "UEEE",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.fruchterman.reingold, 
+     vertex.label = NA)#ifelse(degree(g) >= 60, V(g)$name, NA))
 
 # Hubs:
 
@@ -112,6 +156,18 @@ hubs
 g_hubs = subgraph(g, hubs)
 
 
+# ARE POPULAR ARTISTS HUBS?
+
+names(degree_g[1:200])
+df2 <- dati_artisti_final[order(dati_artisti_final$popularity,decreasing=TRUE),]
+
+df2[1:36,]$name
+
+intersect(names(degree_g[1:70]), df2[1:70,]$name)
+
+V(g)[which(V(g)$Name == "Måneskin")]
+
+neighbors(g, v = , mode = c("out", "in", "all", "total"))
 # Clustering coefficient
 
 igraph::transitivity(
@@ -124,15 +180,21 @@ igraph::transitivity(
 
 # Closeness centrality
 
-mean(igraph::closeness(
+clos_g = igraph::closeness(
   g,
   vids = igraph::V(g),
   mode = 'total',
   weights = NULL,
   normalized = TRUE,
   cutoff = -1
-))
+)
 
+quant_clos = quantile(clos_g[clos_g>0],0.95)
+print(quant_clos)
+hubs_clos <- clos_g[clos_g>=quant_clos]
+hubs_clos
+
+intersect(names(hubs),names(hubs_clos))
 
 # Betweenness centrality
 
@@ -190,11 +252,87 @@ orwg(g, "Genre")
 
 
 specsi = (v <- ssi(g, "Genre"))
-specsi_sort = sort(specsi, decreasing = FALSE)
+mean(specsi)
+
+g = set_vertex_attr(g, 'ssi', index = V(g), specsi)
+
+
+specsi_rap = V(g)[which(V(g)$Genre == 'Rap/Hip-Hop')]$ssi
+popularity_rap = V(g)[which(V(g)$Genre == 'Rap/Hip-Hop')]$Popularity
+mean(specsi_rap)
+mean(popularity_rap)
+
+specsi_pop = V(g)[which(V(g)$Genre == 'Pop')]$ssi
+popularity_pop = V(g)[which(V(g)$Genre == 'Pop')]$Popularity
+mean(specsi_pop)
+mean(popularity_pop)
+
+specsi_indie = V(g)[which(V(g)$Genre == 'Indie')]$ssi
+popularity_indie = V(g)[which(V(g)$Genre == 'Indie')]$Popularity
+mean(specsi_indie)
+mean(popularity_indie)
+
+specsi_emo = V(g)[which(V(g)$Genre == 'Emo/Punk')]$ssi
+popularity_emo = V(g)[which(V(g)$Genre == 'Emo/Punk')]$Popularity
+mean(specsi_emo)
+mean(popularity_emo)
+
+
+rap_nodes = V(g)[which(V(g)$Genre == 'Rap/Hip-Hop')]
+pop_nodes = V(g)[which(V(g)$Genre == 'Pop')]
+indie_nodes = V(g)[which(V(g)$Genre == 'Indie')]
+emo_nodes = V(g)[which(V(g)$Genre == 'Emo/Punk')]
+
+rap_indie = induced_subgraph(g, vids = c(rap_nodes, indie_nodes))
+specsi_rap_indie = (v <- ssi(rap_indie, "Genre"))
+mean(specsi_rap_indie)
+
+genres = c('Rap/Hip-Hop', 'Pop', 'Indie', 'Emo/Punk')
+
+specsi_genres = c()
+
+for (i in genres){
+  #print(i)
+  for (j in genres){
+    if (i != j){
+    nodes1 = V(g)[which(V(g)$Genre == i)]
+    nodes2 = V(g)[which(V(g)$Genre == j)]
+    net = induced_subgraph(g, vids = c(nodes1, nodes2))
+    spsi = (v <- ssi(net, "Genre"))
+    spsi = mean(spsi)
+    specsi_genres[length(specsi_genres)+1]=spsi
+    }
+  }
+}
+
+specsi_genres
+
+## Doesn't seem to work properly
+ei_genres = c()
+
+for (i in genres){
+  #print(i)
+  for (j in genres){
+    if (i != j){
+      nodes1 = V(g)[which(V(g)$Genre == i)]
+      nodes2 = V(g)[which(V(g)$Genre == j)]
+      net = induced_subgraph(g, vids = c(nodes1, nodes2))
+      ei_gen = ei(net, "Genre")
+      ei_gen = mean(ei_gen)
+      ei_genres[length(ei_genres)+1]=ei_gen
+    }
+  }
+}
+
+ei_genres
+
+
+
+specsi_sort = sort(specsi, decreasing = TRUE)
 specsi_sort
  
 index_specsi = as.numeric(names(specsi_sort[1:75]))
-cane1 = V(g)[index_specsi]$name
+cane1 = cbind(V(g)[index_specsi]$name, specsi_sort)
 print(cane1)
 fifty_bet = sort(bet_g, decreasing = TRUE)[1:75]
 cane2 = names(fifty_bet)
@@ -208,12 +346,227 @@ E(g) [ .from(192) ]
 #igraph::any_multiple(g)
 #length(which(which_multiple(g, eids = E(g)))==TRUE)
 
+popular_ssi = which(V(g)[index_specsi]$Popularity > 70)
+V(g)[popular_ssi]
+
+rap_nodes = V(g)[which(V(g)$Genre == 'Rap/Hip-Hop')]
+
+
+uis = make_ego_graph(
+  g,
+  order = 1,
+  nodes = V(g)[5],
+  mode = "all",
+  mindist = 0
+)
+
+V(uis)
+
+
 
 # Assortativity:
 igraph::assortativity_degree(g, directed = FALSE)
 
 igraph::assortativity(g, igraph::V(g)$Popularity, types2 = NULL, directed = FALSE)
 #get.vertex.attribute(g,'Popularity')
+
+knn_g = knn(
+  g,
+  vids = V(g),
+  mode = 'all',
+  neighbor.degree.mode = 'all',
+  weights = NULL
+)
+
+
+knn_g$knn
+
+degree_unsorted = as.data.frame(degree(g, v = V(g)))
+degree_unsorted_un = sort(unique(degree_unsorted[,1]))
+knnk = knn_g$knnk
+knnk = knnk[!is.na(knnk)]
+avg_degree_squared = degree_unsorted^2
+avg_degree_squared = mean(avg_degree_squared[,1])
+neutral = avg_degree_squared / mean(degree_unsorted[,1])
+knnk = append(knnk, neutral)
+#knnk = (knnk-min(knnk))/(max(knnk)-min(knnk))
+#neutral_norm = knnk[57] #〈k2〉 / 〈k〉
+knnk = knnk[1:56]
+plot1 = as.data.frame(cbind(unique(degree_unsorted_un), knnk))
+colnames(plot1) = c('k', 'knnk')
+plot(log(plot1$k), log(plot1$knnk))
+abline(h = log(neutral))
+
+
+ggplot(plot1, aes(x = k, y = knnk)) + 
+  geom_point(color = "firebrick", shape = "diamond", size = 2) + 
+  #geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "k", y = "knn(k)") +
+  theme(axis.title.x = element_text(margin = margin(t = 10), size = 15, face = "italic"),
+        axis.title.y = element_text(margin = margin(r = 10), size = 15, face = "italic")) + 
+  ggtitle("Temperatures in Chicago") + 
+  geom_hline(yintercept=neutral)
+
+log_plot1 = data.frame(k=log(plot1$k),
+                       knnk=log(plot1$knnk))
+
+p1 = ggplot(log_plot1, aes(x = k, y = knnk)) + 
+  geom_point(color = "firebrick", shape = "diamond", size = 2) + 
+  #geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "k", y = "knn(k)") +
+  theme(axis.title.x = element_text(margin = margin(t = 10), size = 15, face = "italic"),
+        axis.title.y = element_text(margin = margin(r = 10), size = 15, face = "italic")) + 
+  ggtitle("Temperatures in Chicago") + 
+  geom_hline(yintercept=log(neutral))
+p1
+
+
+g_rs = rewire(g, with = keeping_degseq(loops = F, niter = 10000))
+igraph::assortativity_degree(g_rs, directed = FALSE)
+g_rm = rewire(g, with = keeping_degseq(loops = T, niter = 10000))
+igraph::assortativity_degree(g_rm, directed = FALSE)
+
+knn_rs = knn(
+  g_rs,
+  vids = V(g_rs),
+  mode = 'all',
+  neighbor.degree.mode = 'all',
+  weights = NULL
+)
+
+knnk_rs = knn_rs$knnk
+knnk_rs = knnk_rs[!is.na(knnk_rs)]
+log_plot2 = data.frame(k=log(plot1$k),
+                       knnk=log(knnk_rs))
+
+
+p2 = p1 + 
+  geom_point(data = log_plot2, shape = 'diamond', size = 2, color = 'orange',
+             mapping = aes(x=k, y= knnk)) +
+  geom_smooth(method = "lm", se = FALSE)
+p2
+p1
+
+
+# knnk but for popularity: is it possible? Let's find out:
+
+#V(g)$name <- V(g) 
+V(g)$name
+# add degree to the graph
+#V(g)$degree <- degree(g, loops = TRUE, normalized = FALSE)
+V(g)$degree
+# get a list of neighbours, for each node
+g_ngh <- neighborhood(g, mindist = 1) 
+
+# write a function that gets the means                       
+get.mean <- function(x){
+  mean(V(g)$Popularity[x]-1)
+}
+
+# apply the function, add result to the graph
+V(g)$av_pop_nei <- sapply(g_ngh, get.mean)
+
+
+# get data into dataframe, if necessary
+d_vert_attr <- igraph::as_data_frame(g, what = "vertices")
+
+popularities = sort(unique(V(g)$Popularity))
+which(d_vert_attr$Popularity == 7)
+
+pnn = data.frame(p = popularities, pnnp = 0)
+
+count_pnnp = 1
+for (i in popularities){
+  popol1 = d_vert_attr[which(d_vert_attr$Popularity == i), ]
+  print(nrow(popol1))
+  
+  pnnp_loop = mean(popol1$av_pop_nei)#ifelse(nrow(popol1) > 1, rowMeans(popol1[ ,7]), popol1[,7])
+  pnn[count_pnnp,2] = pnnp_loop
+  count_pnnp = count_pnnp + 1
+}
+
+log_plot_popol = data.frame(p=log(pnn$p),
+                       pnnp=log(pnn$pnnp))
+
+ggplot(log_plot_popol, aes(x = p, y = pnnp)) + 
+  geom_point(color = "firebrick", shape = "diamond", size = 2) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "k", y = "knn(k)") +
+  theme(axis.title.x = element_text(margin = margin(t = 10), size = 15, face = "italic"),
+        axis.title.y = element_text(margin = margin(r = 10), size = 15, face = "italic")) + 
+  ggtitle("Temperatures in Chicago")
+
+
+### USING THE POPULAR ARTISTS:
+
+populares = dati_artisti_final[which(dati_artisti_final$popularity > 50),]
+
+
+los_populares = g
+
+igraph::assortativity_degree(los_populares, directed = FALSE)
+
+
+### USING MULTI LINKS:
+
+g2 <- graph_from_data_frame(edges, directed=FALSE, vertices=nodes
+)
+gsize(g2)
+gsize(g)
+g2 = set_vertex_attr(g, 'Genre', index = V(g), artisti_genre)
+g2 = set_vertex_attr(g, 'Popularity', index = V(g), artisti_popol)
+g2 = set_vertex_attr(g, 'Followers', index = V(g), artisti_foll)
+
+V(g)[vertex_attr(g,'Genre') == 'Rap/Hip-Hop']$color = 'deeppink4'
+V(g)[vertex_attr(g,'Genre') == 'Indie']$color = 'turquoise4'
+V(g)[vertex_attr(g,'Genre') == 'Pop']$color = 'azure4'
+V(g)[vertex_attr(g,'Genre') == 'Emo/Punk']$color = 'olivedrab'
+
+V(g2)$degree <- degree(g2)
+zero_degree2 = which(degree(g2)==0)
+
+g2 = g2 - zero_degree2
+
+assortativity.degree(g2, directed = FALSE)
+assortativity.degree(g, directed = FALSE)
+
+
+# Clustering :
+
+
+clusterlouvain <- cluster_louvain(g)
+plot(g, vertex.color=rainbow(3, alpha=0.6)[clusterlouvain$membership],
+     edge.curverd=.1, arrow.size=.1, 
+     main = "UEEE",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.fruchterman.reingold, 
+     vertex.label = NA)
+
+clusterlouvain$memberships
+
+a = clusterlouvain$membership
+cane1 = cbind(V(g)[index_specsi]$name, specsi_sort)
+
+V(g)$community <- membership(clusterlouvain)
+
+length(V(g)[which(V(g)$community == 1)])
+
+
+for (i in seq(17)){
+  community_nodes = V(g)[which(V(g)$community == i)]
+  community = induced.subgraph(g, community_nodes)
+  rap_com = (V(community)[which(V(community)$Genre == 'Rap/Hip-Hop')])
+  print(rap_com)
+}
+community_nodes = V(g)[which(V(g)$community == 1)]
+community = induced.subgraph(g, community_nodes)
+community_nodes
+rap_com = V(community)[which(V(community)$Genre == 'Rap/Hip-Hop')]
+print(rap_com)
+
+net = induced_subgraph(g, vids = c(nodes1, nodes2))
+spsi = (v <- ssi(net, "Genre"))
+spsi = mean(spsi)
+specsi_genres[length(specsi_genres)+1]=spsi
 
 
 #Degree correlation matrix:
@@ -248,27 +601,20 @@ out_popol
 
 max(out_popol)
 
+
 # Ok so basically this code here was to plot the matrices
-??pivot_longer
+
 data = melt(out)
+'seq_deg = seq(1:max(data$Var1))
+missing_deg = setdiff(seq_deg, data$Var1[1:56])
+missing_deg_mat = matrix()
+out'
 library(ggplot2)
-full_range <- function(x) seq(min(x), max(x))
-data %>% 
-  as.data.frame() %>% 
-  tibble::rownames_to_column("Var1") %>% 
-  tidyr::pivot_longer(-Var1, names_to="Var2") %>% 
-  mutate(across(Var1:Var2, as.numeric)) %>% {
-    d <- .
-    expand_grid(Var1=full_range(d$Var1), Var2=full_range(d$Var2)) %>% 
-      left_join(d) %>% 
-      replace_na(list(value=0))
-  } %>% 
-  ggplot() +
+ggplot(data = data) +
   theme_bw() +
   geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_viridis_c(name = "") +
+  scale_fill_viridis_b(name = "") +
   labs(x = "k2", y = "k1")
-
 
 
    ### Largest connected component 
@@ -355,6 +701,9 @@ orwg(g_v2, "Genre")
 
 coleman(g_v2, "Genre")
 
+
+
+
     ### Rap network:
 
 g_rap = igraph::delete_vertices(g, igraph::V(g)[!igraph::vertex_attr(g, "Genre") == 'Rap/Hip-Hop'])
@@ -390,20 +739,44 @@ knn_rap = knn(
   weights = NULL
 )
 
-degree_rap_unsorted = as.data.frame(degree(g_rap, v = V(g_rap)))
-plot1_rap = as.data.frame(cbind(degree_rap_unsorted, knn_rap[[1]]))
+degree_unsorted_rap = as.data.frame(degree(g_rap, v = V(g_rap)))
+degree_unsorted_un_rap = sort(unique(degree_unsorted_rap[,1]))
+knnk_rap = knn_rap$knnk
+knnk_rap = knnk_rap[!is.na(knnk_rap)]
+avg_degree_squared_rap = degree_unsorted_rap^2
+avg_degree_squared_rap = mean(avg_degree_squared_rap[,1])
+neutral_rap = avg_degree_squared_rap / mean(degree_unsorted_rap[,1])
+knnk_rap = append(knnk_rap, neutral_rap)
+knnk_rap = (knnk_rap-min(knnk_rap))/(max(knnk_rap)-min(knnk_rap))
+neutral_norm_rap = knnk_rap[length(knnk_rap)] #〈k2〉 / 〈k〉
+knnk_rap = knnk[1:length(knnk_rap)-1]
+plot1_rap = as.data.frame(cbind(unique(degree_unsorted_un_rap), knnk_rap))
+colnames(plot1_rap) = c('k', 'knnk')
+plot(plot1_rap$k, plot1_rap$knnk)
+abline(h = neutral_norm_rap)
 
-colnames(plot1_rap) = c('k', 'knn')
-plot(plot1_rap$k, plot1_rap$knn)
+
+ggplot(plot1, aes(x = k, y = knnk)) + 
+  geom_point(color = "firebrick", shape = "diamond", size = 2) + 
+  labs(x = "k", y = "knn(k)") +
+  theme(axis.title.x = element_text(margin = margin(t = 10), size = 15, face = "italic"),
+        axis.title.y = element_text(margin = margin(r = 10), size = 15, face = "italic")) + 
+  ggtitle("Temperatures in Chicago") + 
+  geom_hline(yintercept=neutral_norm)
 
 
 igraph::assortativity(g_rap, igraph::V(g_rap)$Popularity, directed = FALSE)
 
+g_shuffle_rap = rewire(g_rap, with = keeping_degseq(loops = F, niter = 10000))
+igraph::assortativity_degree(g_shuffle_rap, directed = FALSE)
+
+g_rm_rap = rewire(g_rap, with = keeping_degseq(loops = T, niter = 10000))
+igraph::assortativity_degree(g_rm_rap, directed = FALSE)
 
       ### Pop network:
 
 
-g_pop = delete_vertices(g_v2, V(g_v2)[!vertex_attr(g_v2, "Genre") == 'Pop'])
+g_pop = delete_vertices(g, V(g)[!vertex_attr(g, "Genre") == 'Pop'])
 zero_degree_pop = which(degree(g_pop)==0)
 
 g_pop = g_pop - zero_degree_pop
@@ -436,19 +809,35 @@ knn_pop = knn(
   weights = NULL
 )
 
-degree_pop_unsorted = as.data.frame(degree(g_pop, v = V(g_pop)))
-plot1_pop = as.data.frame(cbind(degree_pop_unsorted, knn_pop[[1]]))
 
-colnames(plot1_pop) = c('k', 'knn')
-plot(plot1_pop$k, plot1_pop$knn)
+degree_unsorted_pop = as.data.frame(degree(g_pop, v = V(g_pop)))
+degree_unsorted_un_pop = sort(unique(degree_unsorted_pop[,1]))
+knnk_pop = knn_pop$knnk
+knnk_pop = knnk_pop[!is.na(knnk_pop)]
+avg_degree_squared_pop = degree_unsorted_pop^2
+avg_degree_squared_pop = mean(avg_degree_squared_pop[,1])
+neutral_pop = avg_degree_squared_pop / mean(degree_unsorted_pop[,1])
+knnk_pop = append(knnk_pop, neutral_pop)
+knnk_pop = (knnk_pop-min(knnk_pop))/(max(knnk_pop)-min(knnk_pop))
+neutral_norm_pop = knnk_pop[length(knnk_pop)] #〈k2〉 / 〈k〉
+knnk_pop = knnk[1:length(knnk_pop)-1]
+plot1_pop = as.data.frame(cbind(unique(degree_unsorted_un_pop), knnk_pop))
+colnames(plot1_pop) = c('k', 'knnk')
+plot(plot1_pop$k, plot1_pop$knnk)
+abline(h = neutral_norm_pop)
 
 assortativity(g_pop, get.vertex.attribute(g_pop,'Popularity'), types2 = NULL, directed = FALSE)
+igraph::assortativity(g_pop, igraph::V(g_pop)$Popularity, directed = FALSE)
 
+g_shuffle_pop = rewire(g_pop, with = keeping_degseq(loops = F, niter = 10000))
+igraph::assortativity_degree(g_shuffle_pop, directed = FALSE)
 
+g_rm_pop = rewire(g_pop, with = keeping_degseq(loops = T, niter = 10000))
+igraph::assortativity_degree(g_rm_pop, directed = FALSE)
 
       ### Indie:
 
-g_indie = delete_vertices(g_v2, V(g_v2)[!vertex_attr(g_v2, "Genre") == 'Indie'])
+g_indie = delete_vertices(g, V(g)[!vertex_attr(g, "Genre") == 'Indie'])
 zero_degree_indie = which(degree(g_indie)==0)
 
 g_indie = g_indie - zero_degree_indie
@@ -481,19 +870,40 @@ knn_indie = knn(
   weights = NULL
 )
 
-degree_indie_unsorted = as.data.frame(degree(g_indie, v = V(g_indie)))
-plot1_indie = as.data.frame(cbind(degree_indie_unsorted, knn_indie[[1]]))
 
-colnames(plot1_indie) = c('k', 'knn')
-plot(plot1_indie$k, plot1_indie$knn)
+degree_unsorted_indie = as.data.frame(degree(g_indie, v = V(g_indie)))
+degree_unsorted_un_indie = sort(unique(degree_unsorted_indie[,1]))
+knnk_indie = knn_indie$knnk
+knnk_indie = knnk_indie[!is.na(knnk_indie)]
+avg_degree_squared_indie = degree_unsorted_indie^2
+avg_degree_squared_indie = mean(avg_degree_squared_indie[,1])
+neutral_indie = avg_degree_squared_indie / mean(degree_unsorted_indie[,1])
+knnk_indie = append(knnk_indie, neutral_indie)
+knnk_indie = (knnk_indie-min(knnk_indie))/(max(knnk_indie)-min(knnk_indie))
+neutral_norm_indie = knnk_indie[length(knnk_indie)] #〈k2〉 / 〈k〉
+knnk_indie = knnk[1:length(knnk_indie)-1]
+plot1_indie = as.data.frame(cbind(unique(degree_unsorted_un_indie), knnk_indie))
+colnames(plot1_indie) = c('k', 'knnk')
+plot(plot1_indie$k, plot1_indie$knnk)
+abline(h = neutral_norm_indie)
 
 assortativity(g_indie, get.vertex.attribute(g_indie,'Popularity'), types2 = NULL, directed = FALSE)
+igraph::assortativity(g_indie, igraph::V(g_indie)$Popularity, directed = FALSE)
 
-most_popular_indie = get.vertex.attribute(g_indie,'Popularity')
+g_shuffle_indie = rewire(g_indie, with = keeping_degseq(loops = F, niter = 10000))
+igraph::assortativity_degree(g_shuffle_indie, directed = FALSE)
+
+g_rm_indie = rewire(g_indie, with = keeping_degseq(loops = T, niter = 10000))
+igraph::assortativity_degree(g_rm_indie, directed = FALSE)
+
+most_popular_indie = sort(V(g_indie)$Popularity, decreasing = T)
+which(V(g_indie)$Popularity == 74)
+
+
 
       ###Emo:
 
-g_emo = delete_vertices(g, V(g)[!vertex_attr(g_v2, "Genre") == 'Emo/Punk'])
+g_emo = delete_vertices(g, V(g)[!vertex_attr(g, "Genre") == 'Emo/Punk'])
 zero_degree_emo = which(degree(g_emo)==0)
 
 g_emo = g_emo - zero_degree_emo
@@ -526,14 +936,29 @@ knn_emo = knn(
   weights = NULL
 )
 
-degree_emo_unsorted = as.data.frame(degree(g_emo, v = V(g_emo)))
-plot1_emo = as.data.frame(cbind(degree_emo_unsorted, knn_emo[[1]]))
 
-colnames(plot1_emo) = c('k', 'knn')
-plot(plot1_emo$k, plot1_emo$knn)
+degree_unsorted_emo = as.data.frame(degree(g_emo, v = V(g_emo)))
+degree_unsorted_un_emo = sort(unique(degree_unsorted_emo[,1]))
+knnk_emo = knn_emo$knnk
+knnk_emo = knnk_emo[!is.na(knnk_emo)]
+avg_degree_squared_emo = degree_unsorted_emo^2
+avg_degree_squared_emo = mean(avg_degree_squared_emo[,1])
+neutral_emo = avg_degree_squared_emo / mean(degree_unsorted_emo[,1])
+knnk_emo = append(knnk_emo, neutral_emo)
+knnk_emo = (knnk_emo-min(knnk_emo))/(max(knnk_emo)-min(knnk_emo))
+neutral_norm_emo = knnk_emo[length(knnk_emo)] #〈k2〉 / 〈k〉
+knnk_emo = knnk[1:length(knnk_emo)-1]
+plot1_emo = as.data.frame(cbind(unique(degree_unsorted_un_emo), knnk_emo))
+colnames(plot1_emo) = c('k', 'knnk')
+plot(plot1_emo$k, plot1_emo$knnk)
+abline(h = neutral_norm_emo)
 
 assortativity(g_emo, get.vertex.attribute(g_emo,'Popularity'), types2 = NULL, directed = FALSE)
+igraph::assortativity(g_emo, igraph::V(g_emo)$Popularity, directed = FALSE)
 
+g_shuffle_emo = rewire(g_emo, with = keeping_degseq(loops = F, niter = 10000))
+igraph::assortativity_degree(g_shuffle_emo, directed = FALSE)
 
-
+g_rm_emo = rewire(g_emo, with = keeping_degseq(loops = T, niter = 10000))
+igraph::assortativity_degree(g_rm_emo, directed = FALSE)
   
