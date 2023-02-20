@@ -12,14 +12,6 @@ library(WGCNA)
 #library(networkD3)
 #library(network)
 
-##### IDEA 07/02 ---> Compara assortativity generale con quella del network
-####################  risultante dopo aver selezionato solo artisti con popularity > 50
-####################  per vedere se assortativity bassa è causa del network troppo grande
-####################  e con molti artisti poco popolari
-
-
-##### 13/02 ---> PENSA A QUESTO: dato che l'assortativity per popolarità è maggiore
-################# di quella per degree, significa che i nodi popolari non sono per forza hubs?
 
 #####
 # Loading and preprocessing
@@ -533,18 +525,16 @@ knnk = knnk[1:56]
 
 
 
-       
-
-
 
 #"knn(k) is the average degree of the neighbors of all degree-k nodes.
 #To quantify degree correlations we inspect the dependence of knn(k) on k."
 
 # ...let's do so
 
-
-log_plot1 = data.frame(k=log(plot1$k),
-                       knnk=log(plot1$knnk)) # Convert data in log scale to visualize better
+plot1 = as.data.frame(cbind(unique(degree_unsorted_un), knnk))
+colnames(plot1) = c('k', 'knnk')
+#log_plot1 = data.frame(k=log(plot1$k),
+#                       knnk=log(plot1$knnk)) # Convert data in log scale to visualize better
 
 
 p1 = ggplot() + 
@@ -792,7 +782,6 @@ mean(assort_rap_values)
 mean(assort_rap_values_rm)
 
 
-
       ### Pop network:
 
 
@@ -850,6 +839,10 @@ mean(assort_pop_values_rm)
 
 sqrt(mean(degree_pop)*length(V(g_pop)))
 max(degree_pop)
+
+
+
+
 
       ### Indie:
 
